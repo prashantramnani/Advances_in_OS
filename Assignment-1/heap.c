@@ -3,6 +3,7 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/errno.h>
 
 MODULE_LICENSE("GPL");
 
@@ -263,7 +264,7 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 	    else
 	    {
 		    printk(KERN_INFO "Number Insert Failed\n");
-		    return -1;
+		    return -EACCES;
 	    }
 	    
 	}
@@ -279,13 +280,14 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 		else
 		{
 			//ERROR in HEAP TYPE
-			return EINVAL;
+			return -EINVAL;
 		}
 		
 		int32_t size = (int32_t)buf[1];
 		if(size<1 || size>100)
-			return EINVAL;	
-		
+		{
+			return -EINVAL;	
+		}
 		if(!HEAD)
 		{
 		   HEAD = new_heap(pid, type, size);
@@ -332,17 +334,18 @@ static ssize_t read(struct file *file, char *buf, size_t count, loff_t *pos) {
 	    		bytestream[2] = (n>>16) & 0xFF;
 	    		bytestream[3] = (n>>24) & 0xFF;
 	    		if(copy_to_user(buf,bytestream,4))
-	    			return -1;
+	    			return -ENOBUFS;
 	    		printk(KERN_INFO "READ : %s %d \n", buf, n);
 			return 4;
 	    	}
-		return -1;
+	    	
+		return -EACCES;
 	}
 	else
 	{
 		// Heap DNE
 		printk(KERN_INFO "NO ENTRY FOR PROCESS : %d\n",pid);
-		return -1;
+		return -EACCES;
 	}
 	
 }
@@ -353,7 +356,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     pid_t pid = current->pid;
     phm* H = heap_get_pid(pid);
     switch(cmd) {
-        case READ_DATA:
+        /*case READ_DATA:
 	    printk(KERN_INFO "IN IOCTL READ\n");
 
             copy_to_user((char*) arg, buffer, 8);
@@ -375,7 +378,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		    printk(KERN_INFO "MAX_HEAP\n");
 		    printk(KERN_INFO "HEAP SIZE %d\n", (int)type_size[1]);
 	    }
-            break;
+            break;*/
 	case PB2_SET_TYPE:
 	    printk(KERN_INFO "IN PB2_SET_TYPE\n");
 	    set_type* size_type = (set_type *)kmalloc(sizeof(set_type), GFP_KERNEL);
@@ -383,7 +386,12 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    if(copy_from_user(size_type, (set_type *)arg, sizeof(set_type)))
 	    {
 		    printk(KERN_INFO "ERROR IN SETTING TYPE\n");
+		    
 		    return -ENOBUFS;
+	    }
+	    if((size_type->heap_type!=0 && size_type->heap_type!=1)||(size_type->heap_size < 1))
+	    {
+		    return -EINVAL;
 	    }
 	    printk(KERN_INFO "SUCCESS IN SETTING TYPE\n");
 	    printk(KERN_INFO "Size %d Type %d \n", size_type->heap_size, size_type->heap_type);
@@ -417,15 +425,22 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	   }
 	   break;
 	case PB2_INSERT:
-
+	
 	    printk(KERN_INFO "IN PB2_INSERT\n");
+	    if(!H)
+	    {
+	    	return -EACCES;
+	    }
+	    	
 	    int32_t* x = (int32_t *)kmalloc(sizeof(int32_t), GFP_KERNEL);
-
+	    	
 	    if(copy_from_user(x, (int32_t *)arg, sizeof(int32_t)))
 	    {
 		    printk(KERN_INFO "ERROR IN RECEIVING NUMBER\n");
 		    return -ENOBUFS;
+
 	    }
+	    
 	    printk(KERN_INFO "SUCCESS IN READING NUMBER\n");
 	    printk(KERN_INFO "Number %d\n", *x);
 	    
@@ -436,24 +451,30 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    {
 		    printk(KERN_INFO "Number Insert Success\n");
 		    printk(KERN_INFO "Number Inserted: %d\n", H->heap[0]);
+		    
+		    int i = H->curr_num_elements;
+	    	printk(KERN_INFO "Number of Elements in Heap: %d\n", H->curr_num_elements);
+		    while(i)
+	    	{
+			    printk(KERN_INFO "Elemnts in heap: %d\n",H->heap[i-1]);
+			    i--;
+	    	}
+		    return 0;
 	    }
 	    else
 	    {
-		    printk(KERN_INFO "Number Insert Failed\n");
-	    }
-	    
-
-	    int i = H->curr_num_elements;
-	    printk(KERN_INFO "Number of Elements in Heap: %d\n", H->curr_num_elements);
-	    while(i)
-	    {
-		    printk(KERN_INFO "Elemnts in heap: %d\n",H->heap[i-1]);
-		    i--;
+		    return -EACCES;
 	    }
 	    break;
 	case PB2_GET_INFO:
-
+		
 	    printk(KERN_INFO "IN PB2_GET_INFO\n");
+	    
+	    if(!H)
+	    {
+	    	return -EACCES;
+	    }
+	    
 	    obj_info* info = (obj_info *)kmalloc(sizeof(obj_info), GFP_KERNEL);
 
 	    //phm* h = heap_get_pid(pid);
@@ -472,6 +493,11 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    break;
 	case PB2_EXTRACT:
 	    printk(KERN_INFO "IN PB2_EXTRACT\n");
+	    
+	    if(!H)
+	    {
+	    	return -EACCES;
+	    }
 	    result* result_o = (result *)kmalloc(sizeof(result),GFP_KERNEL);
 	    
 	    //phm* h = heap_get_pid(pid);
@@ -494,8 +520,8 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    return -1;
 	    break;    
         default:
-	    printk(KERN_INFO "FILE CLOSED\n");
-        return -EINVAL;
+			printk(KERN_INFO "FILE CLOSED\n");
+		    return -EINVAL;
     }
     return 0;
 }
