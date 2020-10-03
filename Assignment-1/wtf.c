@@ -24,6 +24,13 @@ static struct obj_info {
 	int32_t last_inserted;
 };
 
+
+static struct result{
+	int32_t result;
+	int32_t heap_size;
+};
+
+
 int main()
 {
         int fd = open("/proc/heap", O_RDWR);
@@ -77,6 +84,17 @@ int main()
 	ioctl(fd, PB2_INSERT, &x);
 
 	struct obj_info info;
+	ioctl(fd, PB2_GET_INFO, &info);
+
+	printf("%d %d %d %d\n", info.heap_size, info.heap_type, info.root, info.last_inserted);
+	
+	struct result r;
+	ioctl(fd, PB2_EXTRACT, &r);
+	printf("Rs - %d Size-%d\n", r.result, r.heap_size);
+
+	ioctl(fd, PB2_EXTRACT, &r);
+	printf("Rs - %d Size-%d\n", r.result, r.heap_size);
+	
 	ioctl(fd, PB2_GET_INFO, &info);
 
 	printf("%d %d %d %d\n", info.heap_size, info.heap_type, info.root, info.last_inserted);

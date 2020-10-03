@@ -31,6 +31,11 @@ typedef struct obj_info {
 	int32_t last_inserted;
 }obj_info;
 
+typedef struct result{
+	int32_t result;
+	int32_t heap_size;
+} result;
+
 
 typedef struct process_heap_map {
 
@@ -132,6 +137,56 @@ int insert_number(phm* H, int32_t* x)
 	return 1;
 }
 
+void heapify_down(phm* H)
+{
+	int i=0;
+	while(true)
+	{
+		int index = i;
+		int left_child = 2*i + 1;
+		int right_child = 2*(i+1);
+		if(H->type)
+		{
+			if(left_child < H->curr_num_elements && H->heap[left_child] > H->heap[index])
+				index = left_child;
+			if(right_child < H->curr_num_elements && H->heap[right_child] > H->heap[index])
+				index = right_child; 
+		}
+		else
+		{
+			if(left_child < H->curr_num_elements && H->heap[left_child] < H->heap[index])
+				index = left_child;
+			if(right_child < H->curr_num_elements && H->heap[right_child] < H->heap[index])
+				index = right_child;
+			
+		}
+		if(i!=index)
+		{
+			Swap(H,i,index);
+			i=index;
+		}
+		else
+			break;
+	}
+}
+
+int remove_number(phm* H, int32_t* x)
+{
+	if(H->curr_num_elements == 0)
+	{
+		return 1;
+	}
+	*x = H->heap[0];
+	H->heap[0] = H->heap[H->curr_num_elements-1];
+	H->curr_num_elements--;
+
+	// Heapify
+	heapify_down(H);
+	return 0;	
+	
+}
+
+
 static char buffer[256] = {0};
 static int buffer_len = 0;
 
@@ -175,7 +230,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 
     pid_t pid = current->pid;
-
+    phm* H = heap_get_pid(pid);
     switch(cmd) {
         case READ_DATA:
 	    printk(KERN_INFO "IN IOCTL READ\n");
@@ -220,7 +275,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	   }
 	   else
 	   {
-		   phm* H = heap_get_pid(pid);
+		   //phm* H = heap_get_pid(pid);
 
 		   if(H)
 		   {
@@ -253,7 +308,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    printk(KERN_INFO "SUCCESS IN READING NUMBER\n");
 	    printk(KERN_INFO "Number %d\n", *x);
 	    
-	    phm* H = heap_get_pid(pid);
+	    //phm* H = heap_get_pid(pid);
 	    int insert = insert_number(H, x);
 	    
 	    if(insert)
@@ -280,11 +335,11 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    printk(KERN_INFO "IN PB2_GET_INFO\n");
 	    obj_info* info = (obj_info *)kmalloc(sizeof(obj_info), GFP_KERNEL);
 
-	    phm* h = heap_get_pid(pid);
-	    info->heap_size = h->size;
-	    info->heap_type = h->type;
-	    info->root = h->heap[0];
-	    info->last_inserted = h->last_inserted;
+	    //phm* h = heap_get_pid(pid);
+	    info->heap_size = H->size;
+	    info->heap_type = H->type;
+	    info->root = H->heap[0];
+	    info->last_inserted = H->last_inserted;
 
 	    if(copy_to_user((obj_info *)arg, info, sizeof(obj_info)))
 	    {
@@ -295,6 +350,27 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	    break;
 	case PB2_EXTRACT:
+	    printk(KERN_INFO "IN PB2_EXTRACT\n");
+	    result* result_o = (result *)kmalloc(sizeof(result),GFP_KERNEL);
+	    
+	    //phm* h = heap_get_pid(pid);
+	    if(H)
+	    {
+	    	int32_t n;
+	    	if(!remove_number(H,&n))
+	    	{
+	    		result_o->result = n;
+	    		result_o->heap_size = H->curr_num_elements;
+	    		if(copy_to_user((result *)arg, result_o, sizeof(result)))
+			    {
+				    printk(KERN_INFO "ERROR IN EXTRACT\n");
+				    return -1;
+			    }
+	    		printk(KERN_INFO "SUCCESS IN GET INFO\n");
+			return 0;
+	    	}
+	    }
+	    return -1;
 	    break;    
         default:
 	    printk(KERN_INFO "FILE CLOSED\n");
