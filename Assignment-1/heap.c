@@ -17,6 +17,7 @@ MODULE_LICENSE("GPL");
 #define min_heap 0xFF
 #define max_heap 0xF0
 
+
 static struct file_operations file_ops;
 
 typedef struct pb2_set_type_arguments {
@@ -206,24 +207,144 @@ static int open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static int release(struct inode *inode, struct file *file)
+{
+	printk(KERN_INFO "FILE RELEASE\n");
+	pid_t pid = current->pid;
+	phm* h = heap_get_pid(pid);
+	if(h)
+	{
+		phm* left = h->prev;
+		phm* right = h->next;
+		if(left)
+			left->next = right;
+		else
+			HEAD = right;
+		if(right)
+			right->prev= left;
+		else
+			TAIL = left;
+		kfree(h->heap);
+		kfree(h);
+		printk(KERN_INFO "close() - File closed successfully for Process: %d\n", pid);
+		return 0;
+	}
+	printk(KERN_INFO "close() - File not open by Process: %d\n", pid);
+	return 0;
+}
+
 static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *pos) {
 	printk(KERN_INFO "IN WRITE\n");
 
 	if(!buf || !count) return -EINVAL;
-    	if(copy_from_user(buffer, buf, count < 256 ? count:256)) return -ENOBUFS;
-    	buffer_len = count < 256 ? count:256;
-    	printk(KERN_INFO "%.*s", (int)count, buf);    return buffer_len;
+    pid_t pid = current->pid;
+	phm* H = heap_get_pid(pid);
+	if(H)
+	{
+		//INSERT NEW ELEMENTS
+		printk("INSERTING %s",buf);
+		int32_t number = *(int32_t *)buf;
+		printk(": %d\n",number);
+		int insert = insert_number(H, &number);
+	    
+	    if(insert)
+	    {
+		    printk(KERN_INFO "Number Insert Success\n");
+		    printk(KERN_INFO "Number Inserted: %d\n", H->heap[0]);
+		    int i = H->curr_num_elements;
+			printk(KERN_INFO "Number of Elements in Heap: %d\n", H->curr_num_elements);
+			while(i)
+			{
+				printk(KERN_INFO "Elemnts in heap: %d\n",H->heap[i-1]);
+				i--;
+			}
+		    return 4;
+	    }
+	    else
+	    {
+		    printk(KERN_INFO "Number Insert Failed\n");
+		    return -1;
+	    }
+	    
+	}
+	else
+	{
+		//INITIALISE THE Node
+		unsigned char mode = (unsigned char)buf[0];
+		int32_t type;
+		if(mode == min_heap)
+			type=0;
+		else if(mode == max_heap)
+			type=1;
+		else
+		{
+			//ERROR in HEAP TYPE
+			return EINVAL;
+		}
+		
+		int32_t size = (int32_t)buf[1];
+		if(size<1 || size>100)
+			return EINVAL;	
+		
+		if(!HEAD)
+		{
+		   HEAD = new_heap(pid, type, size);
+		   TAIL = HEAD;
+		   printk(KERN_INFO "HEAD %d %d\n", HEAD->size, HEAD->type);
+		}
+		else
+		{
+		   //phm* H = heap_get_pid(pid);
+
+		   if(H)
+		   {
+			   kfree(H->heap);
+			   H->type = type;
+			   H->size = size;
+			   H->curr_num_elements = 0;
+			   H->heap = (int32_t *)kmalloc(H->size*sizeof(int32_t), GFP_KERNEL);
+		   }
+		   else
+		   {
+		   	   H = new_heap(pid, type, size);
+			   TAIL->next = H;
+			   H->prev = TAIL;
+			   TAIL = H;
+		   }
+		}
+		return 2;
+    }
 }
 
 static ssize_t read(struct file *file, char *buf, size_t count, loff_t *pos) {
 	printk(KERN_INFO "IN READ\n");
-    	int ret = buffer_len;
-    	if(!buffer_len) return 0;
-    	if(!buf || !count) return -EINVAL;
-    	if(copy_to_user(buf, buffer, buffer_len)) return -ENOBUFS;
-    	printk(KERN_INFO "%.*s", (int)buffer_len, buffer);
-    	buffer_len = 0;
-	return ret;
+    	pid_t pid = current->pid;
+	phm* H = heap_get_pid(pid);
+	if(H)
+	{
+		// Heap exists
+		int32_t n;
+	    	if(!remove_number(H,&n))
+	    	{
+	    		char bytestream[4];
+	    		bytestream[0] = n & 0xFF;
+	    		bytestream[1] = (n>>8) & 0xFF;
+	    		bytestream[2] = (n>>16) & 0xFF;
+	    		bytestream[3] = (n>>24) & 0xFF;
+	    		if(copy_to_user(buf,bytestream,4))
+	    			return -1;
+	    		printk(KERN_INFO "READ : %s %d \n", buf, n);
+			return 4;
+	    	}
+		return -1;
+	}
+	else
+	{
+		// Heap DNE
+		printk(KERN_INFO "NO ENTRY FOR PROCESS : %d\n",pid);
+		return -1;
+	}
+	
 }
 
 static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -388,6 +509,7 @@ static int hello_init(void)
         file_ops.write = write;
 	file_ops.read = read;
 	file_ops.open = open;
+	file_ops.release = release;
 	file_ops.unlocked_ioctl = ioctl;
 
         printk(KERN_ALERT "Hello, heap\n");
