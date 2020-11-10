@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "disk.h"
 #include "sfs.h"
 
@@ -47,27 +48,34 @@ void init_superblock(disk* diskptr, super_block* sb) {
 }
 
 void init_inode_block(super_block* sb, inode* inodes) {
+    for(int i=0;i<128;++i) {
+        inodes[i].valid = 0;
+    }
+}
+
+void print_inode_info(disk* diskptr, super_block* sb) {
     for(int i=0;i<sb->inode_blocks;++i) {
-        inodes[i].valid = i;
+        inode* x = (inode *)malloc(128*sizeof(inode));
+        read_block(diskptr, sb->inode_block_idx + i, (void *)x);
+        for(int j=0;j<128;++j) {
+            printf("READING: %d\n", x[j].valid);    
+        }
     }
 }
 
 int format(disk *diskptr) {
     super_block* sb = (super_block *)malloc(sizeof(super_block));
     init_superblock(diskptr, sb);
-    write_block(diskptr, 0, (void *)sb);    
+    char* C = (char *)calloc(BLOCKSIZE, sizeof(char));
+    memcpy(C, sb, sizeof(super_block));
+    write_block(diskptr, 0, (void *)C);    
 
-    inode* inodes = (inode *)malloc(sb->inode_blocks * 128 * sizeof(inode));
+    inode* inodes = (inode *)malloc(128 * sizeof(inode));
     init_inode_block(sb, inodes);
-    inode* I = inodes;
     for(int i=0;i<sb->inode_blocks;++i) {
-        write_block(diskptr, sb->inode_block_idx + i, (void *)I++);    
+        write_block(diskptr, sb->inode_block_idx + i, (void *)inodes);    
     }
-    // for(int i=0;i<sb->inode_blocks;++i) {
-    //     inode* x = (inode *)malloc(sizeof(inode));
-    //     read_block(diskptr, sb->inode_block_idx + i, (void *)x);
-    //     printf("READING: %d\n", x->valid);    
-    // }
+    
 
     return 0;
 }
