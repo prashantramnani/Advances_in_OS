@@ -52,6 +52,10 @@ int main(){
 		exit(-1);
 	}
 	int x = format(new_disk);
-	// print_superblock_info((super_block *)new_disk->block_arr[0]);
+	if(mount(new_disk) < 0) {
+		printf("Mount unsuccessfull\n");
+		exit(-1);
+	}
+	printf("Mount successfull\n");
 	return 0;
 }

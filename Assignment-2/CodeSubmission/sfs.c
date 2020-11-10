@@ -80,7 +80,17 @@ int format(disk *diskptr) {
     return 0;
 }
 
-int mount(disk *diskptr);
+int mount(disk *diskptr) {
+    char* c;
+    read_block(diskptr, 0, (void *)c);
+    super_block* sb = (super_block*)malloc(sizeof(super_block));
+    memcpy(sb, c, sizeof(super_block));
+
+    if(sb->magic_number == 12345) {
+        return 0;
+    }
+    return -1;
+}
 
 int create_file();
 
