@@ -1,7 +1,7 @@
-#include "disk.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "disk.h"
 
 int create_disk(disk *diskptr, int nbytes){
 	
@@ -69,4 +69,12 @@ int free_disk(disk *diskptr){
 		return 0;
 	}
 	return -1;
+}
+
+void print_disk_info(disk* diskptr) {
+	printf("Information about the Disk\n");
+	printf("Disk Size: %d\n", diskptr->size);
+	printf("Number of Blocks: %d\n", diskptr->blocks);
+	printf("Number of Reads: %d\n", diskptr->reads);
+	printf("Number of Writes: %d\n", diskptr->writes);
 }
