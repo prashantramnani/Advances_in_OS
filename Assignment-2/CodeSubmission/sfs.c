@@ -93,7 +93,7 @@ int format(disk *diskptr) {
             return -1;
     }
     // initialise datablock bitmap
-    for(int i=data_block_bitmap_idx;i<inode_block_idx;i++){
+    for(int i=sb->data_block_bitmap_idx;i<sb->inode_block_idx;i++){
         if(write_block(diskptr, i, (void *)C2)!=0)
             return -1;  
     }
