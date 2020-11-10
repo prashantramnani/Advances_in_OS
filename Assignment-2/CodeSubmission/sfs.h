@@ -45,3 +45,5 @@ int read_file(char *filepath, char *data, int length, int offset);
 int write_file(char *filepath, char *data, int length, int offset);
 int create_dir(char *dirpath);
 int remove_dir(char *dirpath);
+
+void print_superblock_info(super_block* sb);

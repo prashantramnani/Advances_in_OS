@@ -31,14 +31,27 @@ void check_disk_functions(disk* diskptr) {
 	printf("Disk functions work!\n");
 }
 
+void total_size_check(disk* diskptr, int size) {
+	int x = 0;
+	x += sizeof(*(diskptr));
+	for(int i=0;i<diskptr->blocks;++i) {
+		x += 4*1024;
+	}
+	if(x == size) {
+		printf("Size matches\n");
+		return;
+	}
+	printf("Size does not matche\n");
+}
+
 int main(){
 	disk* new_disk = (disk *)malloc(sizeof(disk));
-	if(create_disk(new_disk, 4120) < 0) {
+	int size = 200000;
+	if(create_disk(new_disk, size) < 0) {
 		printf("Error in creating disk\n");
 		exit(-1);
 	}
-	print_disk_info(new_disk);
-	check_disk_functions(new_disk);
-
+	int x = format(new_disk);
+	// print_superblock_info((super_block *)new_disk->block_arr[0]);
 	return 0;
 }
