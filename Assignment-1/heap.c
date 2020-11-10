@@ -18,6 +18,8 @@ MODULE_LICENSE("GPL");
 #define min_heap 0xFF
 #define max_heap 0xF0
 
+static DEFINE_MUTEX(heap_mutex);
+
 
 static struct file_operations file_ops;
 
@@ -198,20 +200,23 @@ static int open(struct inode *inode, struct file *file)
 {
 	printk(KERN_INFO "FILE OPEN\n");
 	pid_t pid = current->pid;
-
+	while(!mutex_trylock(&heap_mutex));
 	if(heap_get_pid(pid))
 	{
 		printk(KERN_INFO "open() - File already open in Process: %d\n", pid);
-		return -EACCES;
+		mutex_unlock(&heap_mutex);
+    	return -EACCES;
 	}
 	printk(KERN_INFO "open() - File open successfull for Process: %d\n", pid);
-	return 0;
+	mutex_unlock(&heap_mutex);
+    return 0;
 }
 
 static int release(struct inode *inode, struct file *file)
 {
 	printk(KERN_INFO "FILE RELEASE\n");
 	pid_t pid = current->pid;
+	while(!mutex_trylock(&heap_mutex));
 	phm* h = heap_get_pid(pid);
 	if(h)
 	{
@@ -228,10 +233,12 @@ static int release(struct inode *inode, struct file *file)
 		kfree(h->heap);
 		kfree(h);
 		printk(KERN_INFO "close() - File closed successfully for Process: %d\n", pid);
-		return 0;
+		mutex_unlock(&heap_mutex);
+    	return 0;
 	}
 	printk(KERN_INFO "close() - File not open by Process: %d\n", pid);
-	return 0;
+	mutex_unlock(&heap_mutex);
+    return 0;
 }
 
 static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *pos) {
@@ -239,6 +246,7 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 
 	if(!buf || !count) return -EINVAL;
     pid_t pid = current->pid;
+    while(!mutex_trylock(&heap_mutex));
 	phm* H = heap_get_pid(pid);
 	if(H)
 	{
@@ -259,11 +267,13 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 				printk(KERN_INFO "Elemnts in heap: %d\n",H->heap[i-1]);
 				i--;
 			}
+			mutex_unlock(&heap_mutex);
 		    return 4;
 	    }
 	    else
 	    {
 		    printk(KERN_INFO "Number Insert Failed\n");
+		    mutex_unlock(&heap_mutex);
 		    return -EACCES;
 	    }
 	    
@@ -280,13 +290,15 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 		else
 		{
 			//ERROR in HEAP TYPE
-			return -EINVAL;
+			mutex_unlock(&heap_mutex);
+    		return -EINVAL;
 		}
 		
 		int32_t size = (int32_t)buf[1];
 		if(size<1 || size>100)
 		{
-			return -EINVAL;	
+			mutex_unlock(&heap_mutex);
+    		return -EINVAL;	
 		}
 		if(!HEAD)
 		{
@@ -314,13 +326,15 @@ static ssize_t write(struct file *file, const char *buf, size_t count, loff_t *p
 			   TAIL = H;
 		   }
 		}
-		return 2;
+		mutex_unlock(&heap_mutex);
+    	return 2;
     }
 }
 
 static ssize_t read(struct file *file, char *buf, size_t count, loff_t *pos) {
 	printk(KERN_INFO "IN READ\n");
-    	pid_t pid = current->pid;
+	pid_t pid = current->pid;
+	while(!mutex_trylock(&heap_mutex));
 	phm* H = heap_get_pid(pid);
 	if(H)
 	{
@@ -328,22 +342,25 @@ static ssize_t read(struct file *file, char *buf, size_t count, loff_t *pos) {
 		int32_t n;
 	    	if(!remove_number(H,&n))
 	    	{
+	    		mutex_unlock(&heap_mutex);
 	    		char bytestream[4];
 	    		bytestream[0] = n & 0xFF;
 	    		bytestream[1] = (n>>8) & 0xFF;
 	    		bytestream[2] = (n>>16) & 0xFF;
 	    		bytestream[3] = (n>>24) & 0xFF;
-	    		if(copy_to_user(buf,bytestream,4))
+	    		if(copy_to_user(buf,bytestream,count))
 	    			return -ENOBUFS;
 	    		printk(KERN_INFO "READ : %s %d \n", buf, n);
-			return 4;
+			return count;
 	    	}
-	    	
+	    
+		mutex_unlock(&heap_mutex);	
 		return -EACCES;
 	}
 	else
 	{
 		// Heap DNE
+		mutex_unlock(&heap_mutex);
 		printk(KERN_INFO "NO ENTRY FOR PROCESS : %d\n",pid);
 		return -EACCES;
 	}
@@ -354,31 +371,11 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 
     pid_t pid = current->pid;
+    while(!mutex_trylock(&heap_mutex));
     phm* H = heap_get_pid(pid);
+	mutex_unlock(&heap_mutex);
     switch(cmd) {
-        /*case READ_DATA:
-	    printk(KERN_INFO "IN IOCTL READ\n");
-
-            copy_to_user((char*) arg, buffer, 8);
-            break;
-	case WRITE_DATA:
-	    printk(KERN_INFO "IN IOCTL WRITE\n");
-
-    	    if(copy_from_user(type_size, (unsigned char *)arg, 2)) return -ENOBUFS;
-    	    printk(KERN_INFO "%.*s\n", 2, type_size);
-	    printk(KERN_INFO "%x\n", type_size[0]);
-
-	    if(type_size[0] == min_heap)
-	    {
-		    printk(KERN_INFO "MIN_HEAP\n");
-		    printk(KERN_INFO "HEAP SIZE %d\n", (int)type_size[1]);
-	    }
-	    else if(type_size[0] == max_heap)
-	    {
-		    printk(KERN_INFO "MAX_HEAP\n");
-		    printk(KERN_INFO "HEAP SIZE %d\n", (int)type_size[1]);
-	    }
-            break;*/
+    
 	case PB2_SET_TYPE:
 	    printk(KERN_INFO "IN PB2_SET_TYPE\n");
 	    set_type* size_type = (set_type *)kmalloc(sizeof(set_type), GFP_KERNEL);
@@ -386,16 +383,18 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    if(copy_from_user(size_type, (set_type *)arg, sizeof(set_type)))
 	    {
 		    printk(KERN_INFO "ERROR IN SETTING TYPE\n");
-		    
+			kfree(size_type);    
 		    return -ENOBUFS;
 	    }
 	    if((size_type->heap_type!=0 && size_type->heap_type!=1)||(size_type->heap_size < 1))
 	    {
+	    	kfree(size_type);
 		    return -EINVAL;
 	    }
 	    printk(KERN_INFO "SUCCESS IN SETTING TYPE\n");
 	    printk(KERN_INFO "Size %d Type %d \n", size_type->heap_size, size_type->heap_type);
-	    
+	   
+	   while(!mutex_trylock(&heap_mutex)); 
 	   if(!HEAD)
 	   {
 		   HEAD = new_heap(pid, size_type->heap_type, size_type->heap_size);
@@ -423,6 +422,9 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			   TAIL = H;
 		   }
 	   }
+	   mutex_unlock(&heap_mutex);
+	   kfree(size_type);
+	   return 0;
 	   break;
 	case PB2_INSERT:
 	
@@ -436,6 +438,7 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    	
 	    if(copy_from_user(x, (int32_t *)arg, sizeof(int32_t)))
 	    {
+			kfree(x);
 		    printk(KERN_INFO "ERROR IN RECEIVING NUMBER\n");
 		    return -ENOBUFS;
 
@@ -445,8 +448,11 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    printk(KERN_INFO "Number %d\n", *x);
 	    
 	    //phm* H = heap_get_pid(pid);
+		while(!mutex_trylock(&heap_mutex));
 	    int insert = insert_number(H, x);
-	    
+	    mutex_unlock(&heap_mutex);
+    
+	    kfree(x);
 	    if(insert)
 	    {
 		    printk(KERN_INFO "Number Insert Success\n");
@@ -478,18 +484,20 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    obj_info* info = (obj_info *)kmalloc(sizeof(obj_info), GFP_KERNEL);
 
 	    //phm* h = heap_get_pid(pid);
-	    info->heap_size = H->size;
+	    info->heap_size = H->curr_num_elements;
 	    info->heap_type = H->type;
 	    info->root = H->heap[0];
 	    info->last_inserted = H->last_inserted;
 
 	    if(copy_to_user((obj_info *)arg, info, sizeof(obj_info)))
 	    {
+	    	kfree(info);
 		    printk(KERN_INFO "ERROR IN GET INFO\n");
 		    return -ENOBUFS;
 	    }
 	    printk(KERN_INFO "SUCCESS IN GET INFO\n");
-
+    	kfree(info);
+    	return 0;
 	    break;
 	case PB2_EXTRACT:
 	    printk(KERN_INFO "IN PB2_EXTRACT\n");
@@ -504,19 +512,26 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	    if(H)
 	    {
 	    	int32_t n;
+	    	while(!mutex_trylock(&heap_mutex));
 	    	if(!remove_number(H,&n))
 	    	{
 	    		result_o->result = n;
 	    		result_o->heap_size = H->curr_num_elements;
 	    		if(copy_to_user((result *)arg, result_o, sizeof(result)))
 			    {
+			    	kfree(result_o);
+			    	mutex_unlock(&heap_mutex);
 				    printk(KERN_INFO "ERROR IN EXTRACT\n");
 				    return -1;
 			    }
+				mutex_unlock(&heap_mutex);
+		    	kfree(result_o);
 	    		printk(KERN_INFO "SUCCESS IN GET INFO\n");
 			return 0;
 	    	}
+	    	mutex_unlock(&heap_mutex);
 	    }
+	    kfree(result_o);
 	    return -1;
 	    break;    
         default:
@@ -529,8 +544,10 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 static int hello_init(void)
 {
-        struct proc_dir_entry *entry = proc_create("heap", 0, NULL, &file_ops);
-        if(!entry) return -ENOENT;
+        struct proc_dir_entry *entryA = proc_create("partb_1_17CS10048", 0777, NULL, &file_ops);
+        struct proc_dir_entry *entryB = proc_create("partb_2_17CS10038", 0777, NULL, &file_ops);
+        if(!entryA) return -ENOENT;
+        if(!entryB) return -ENOENT;
         file_ops.owner = THIS_MODULE;
         file_ops.write = write;
 	file_ops.read = read;
@@ -544,7 +561,9 @@ static int hello_init(void)
 
 static void hello_exit(void)
 {
-        remove_proc_entry("heap", NULL);
+        remove_proc_entry("heapA", NULL);
+        remove_proc_entry("heapB", NULL);
+ 		mutex_destroy(&heap_mutex);
         printk(KERN_ALERT "Nikal laude\n");
 }
 
