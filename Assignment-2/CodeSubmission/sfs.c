@@ -65,6 +65,10 @@ void print_inode_info(disk* diskptr, super_block* sb) {
 
 int format(disk *diskptr) {
     
+    // Check validity of diskptr
+    if(diskptr==NULL)
+        return -1;
+
     // initialise super block
     super_block* sb = (super_block *)malloc(sizeof(super_block));
     init_superblock(diskptr, sb);
@@ -97,9 +101,37 @@ int format(disk *diskptr) {
         if(write_block(diskptr, i, (void *)C2)!=0)
             return -1;  
     }
-        
+    free(C2);
+    
     return 0;
 }
+
+int _set_kthbit(disk *diskptr, int bitmap_block_idx, int k){
+    int* C = (int *)calloc(BLOCKSIZE, sizeof(char));
+    if(read_block(diskptr, i, (void *)C)!=0){
+        return -1;
+    }
+    C[(k/32)] |= (1 << (k%32));
+    if(write_block(diskptr, i, (void *)C)!=0){
+        return -1;
+    }
+    free(C2);
+    return 0;
+}
+
+int _reset_kthbit(disk *diskptr, int bitmap_block_idx, int k){
+    int* C = (int *)calloc(BLOCKSIZE, sizeof(char));
+    if(read_block(diskptr, i, (void *)C)!=0){
+        return -1;
+    }
+    C[(k/32)] &= ~(1 << (k%32));
+    if(write_block(diskptr, i, (void *)C)!=0){
+        return -1;
+    }
+    free(C2);
+    return 0;
+}
+
 
 int mount(disk *diskptr);
 
