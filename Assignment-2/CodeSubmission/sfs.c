@@ -64,24 +64,45 @@ void print_inode_info(disk* diskptr, super_block* sb) {
 }
 
 int format(disk *diskptr) {
+    
+    // initialise super block
     super_block* sb = (super_block *)malloc(sizeof(super_block));
     init_superblock(diskptr, sb);
+
+    // write super block to disk
     char* C = (char *)calloc(BLOCKSIZE, sizeof(char));
     memcpy(C, sb, sizeof(super_block));
     write_block(diskptr, 0, (void *)C);    
+    free(C);
 
+    // initialize inode
     inode* inodes = (inode *)malloc(128 * sizeof(inode));
     init_inode_block(sb, inodes);
+    
+    // write inode to disk
     for(int i=0;i<sb->inode_blocks;++i) {
-        write_block(diskptr, sb->inode_block_idx + i, (void *)inodes);    
+        if(write_block(diskptr, sb->inode_block_idx + i, (void *)inodes)!=0)
+            return -1;    
     }
     
-
+    // initialise bitmap
+    char* C2 = (char *)calloc(BLOCKSIZE, sizeof(char));
+    // initialise inode bitmap
+    for(int i=1;i<sb->data_block_bitmap_idx;i++){
+        if(write_block(diskptr, i, (void *)C2)!=0)
+            return -1;
+    }
+    // initialise datablock bitmap
+    for(int i=sb->data_block_bitmap_idx;i<sb->inode_block_idx;i++){
+        if(write_block(diskptr, i, (void *)C2)!=0)
+            return -1;  
+    }
+        
     return 0;
 }
 
 int mount(disk *diskptr) {
-    char* c;
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(diskptr, 0, (void *)c);
     super_block* sb = (super_block*)malloc(sizeof(super_block));
     memcpy(sb, c, sizeof(super_block));
