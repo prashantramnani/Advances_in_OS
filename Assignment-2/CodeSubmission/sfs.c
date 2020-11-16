@@ -4,6 +4,8 @@
 #include "disk.h"
 #include "sfs.h"
 
+#define ceil(a,b) ((a+b-1)/b)
+
 void print_superblock_info(super_block* sb) {
     printf("Super Block Info\n\n");
     printf("Magic Number: %d\n", sb->magic_number);
@@ -126,10 +128,12 @@ int mount(disk *diskptr) {
     memcpy(sb, c, sizeof(super_block));
 
     if(sb->magic_number == 12345) {
+        global_diskptr = diskptr;
         return 0;
     }
     return -1;
 }
+
 int _reset_kthbit(disk *diskptr, int bitmap_block_idx, int k){
     int* C = (int *)calloc(BLOCKSIZE, sizeof(char));
     if(read_block(diskptr, bitmap_block_idx, (void *)C)!=0){
@@ -146,12 +150,107 @@ int _reset_kthbit(disk *diskptr, int bitmap_block_idx, int k){
 
 int mount(disk *diskptr);
 
-int create_file();
+int create_file() {
+    if(global_diskptr == NULL) {
+		return -1;
+	}
 
-int remove_file(int inumber);
+    // Read Super Block
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, 0, (void *)c);
+    super_block* sb = (super_block*)malloc(sizeof(super_block));
+    memcpy(sb, c, sizeof(super_block));
 
-int stat(int inumber);
+
+    // Find first empty bitmap
+    int bitmap_block_i=1, bits_i=0, flag=0;
+    for(; bitmap_block_i<sb->data_block_bitmap_idx;bitmap_block_i++){
+        int* A = (int *)calloc(BLOCKSIZE, sizeof(char));
+        if(read_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
+            return -1;
+        }
+        int k=0;
+        for(bits_i = 0; bits_i<BLOCKSIZE/4;bits_i++){
+            for(k=0;k<32;k++){
+                if(!( A[(bits_i)] & (1 << k) )){
+                    // Unset Bit found
+                    A[bits_i] |= (1 << k);
+                    flag=1;
+                    // Update the inode bitmap
+                    if(write_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
+                        return -1;
+                    }
+                    break;
+                }
+            }
+            if(flag)
+                break;
+        }
+        if(flag){
+            // Bitmap found
+            // Update inode
+            // 1024*32*bitmap_block_i + 32*bits_i + k
+            int inode_idx = BLOCKSIZE*8*bitmap_block_i + 32*bits_i + k;
+            int inode_block_idx = sb->inode_block_idx + inode_idx/128;
+            int inode_i = inode_idx%128;
+        
+            char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+            read_block(global_diskptr, inode_block_idx, (void *)c);
+            inode* __inode = (inode*)malloc(sizeof(inode));
+            memcpy(__inode, c+(32*inode_i), sizeof(inode));
+            __inode->size=0;
+            __inode->valid=1;
+            memcpy(c+(32*inode_i), __inode, sizeof(inode));
+            write_block(global_diskptr, inode_block_idx, (void*)c);
+            free(c);
+            free(A);
+            break;
+        }
+        free(A);
+    }
+    free(sb);
+    if(!flag){
+        // No empty bitmap found :(
+            return -1;
+    }
+    return 0;
+}
+
+int stat(int inumber) {
+    if(global_diskptr == NULL) {
+		return -1;
+	}
+
+    // Read Super Block
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, 0, (void *)c);
+    super_block* sb = (super_block*)malloc(sizeof(super_block));
+    memcpy(sb, c, sizeof(super_block));
+
+    int inode_block_idx = sb->inode_block_idx + inumber/128;
+    int inode_i = inumber%128;
+
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, inode_block_idx, (void *)c);
+    inode* __inode = (inode*)malloc(sizeof(inode));
+    memcpy(__inode, c+(32*inode_i), sizeof(inode));
+
+    int logical_size = __inode->size;
+    int num_direct_pointer = min(ceil(logical_size,(BLOCKSIZE)), 5);
+    int num_indirect_pointer = (logical_size <= 5*BLOCKSIZE) ? 0 : 1;
+    int data_blocks = ceil(logical_size,(BLOCKSIZE));
+
+    printf("Logical Size: %d\n", __inode->size);
+    printf("Number of Direct Pointers: %d\n", num_direct_pointer);
+    printf("Number of Indirect Pointers: %d\n", num_indirect_pointer);
+    printf("Number of Data Blocks: %d\n", data_blocks);
+
+    free(__inode);
+    return 0;
+}
 
 int read_i(int inumber, char *data, int length, int offset);
 
 int write_i(int inumber, char *data, int length, int offset);
+
+int remove_file(int inumber);

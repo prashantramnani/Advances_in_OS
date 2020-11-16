@@ -3,6 +3,8 @@
 #include "disk.h"
 #include "sfs.h"
 
+// extern disk* global_diskptr;
+
 void check_disk_functions(disk* diskptr) {
 	int n= 10;
 	int* a;
@@ -52,10 +54,15 @@ int main(){
 		exit(-1);
 	}
 	int x = format(new_disk);
-	if(mount(new_disk) < 0) {
+	if(mount(new_disk) < 0 ) {
 		printf("Mount unsuccessfull\n");
 		exit(-1);
 	}
+
 	printf("Mount successfull\n");
+	if(create_file() < 0 ) {
+		printf("File creation unsuccessfull\n");
+		exit(-1);
+	}
 	return 0;
 }

@@ -47,3 +47,5 @@ int create_dir(char *dirpath);
 int remove_dir(char *dirpath);
 
 void print_superblock_info(super_block* sb);
+
+static disk *global_diskptr = NULL;
