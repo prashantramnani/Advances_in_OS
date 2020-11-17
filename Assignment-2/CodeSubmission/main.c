@@ -64,5 +64,14 @@ int main(){
 		printf("File creation unsuccessfull\n");
 		exit(-1);
 	}
+
+	char* a = (char *)malloc(3*sizeof(char));
+	a[0] = 'm';
+	a[1] = 'n';
+	a[2] = 'q';
+	if(write_i(0, a, 3, 2000) < 0) {
+		printf("Write Unsuccessfull\n");
+	}
+	read_i(0, a, 3, 2000);
 	return 0;
 }

@@ -48,4 +48,6 @@ int remove_dir(char *dirpath);
 
 void print_superblock_info(super_block* sb);
 
+int is_valid(super_block* sb, int inumber, int offset);
+
 static disk *global_diskptr = NULL;
