@@ -69,9 +69,9 @@ int main(){
 	a[0] = 'm';
 	a[1] = 'n';
 	a[2] = 'q';
-	if(write_i(0, a, 3, 2000) < 0) {
+	if(write_i(0, a, 3, 5*BLOCKSIZE-1) < 0) {
 		printf("Write Unsuccessfull\n");
 	}
-	read_i(0, a, 3, 2000);
+	read_i(0, a, 3, 5*BLOCKSIZE-1);
 	return 0;
 }

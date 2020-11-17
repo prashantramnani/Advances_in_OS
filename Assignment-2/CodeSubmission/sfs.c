@@ -306,6 +306,7 @@ int find_empty_data_block(super_block* sb, inode* __inode) {
 
 
 int write_i(int inumber, char *data, int length, int offset) {
+    printf("\n IN WRITE_I \n");
     if(global_diskptr == NULL) {
 		return -1;
 	}
@@ -345,6 +346,7 @@ int write_i(int inumber, char *data, int length, int offset) {
 
     int allocate_indirect = 0;
     int* indirect_pointer;
+    int block_index_indirect;
 
     while(length > 0) {
         printf("Length left in bytes: %d\n", length);
@@ -354,6 +356,7 @@ int write_i(int inumber, char *data, int length, int offset) {
                 // Allo cate direct pointer
                 // int index = function_to_find_available_data_bitmap_idx()
                 block_index = find_empty_data_block(sb, __inode);
+                printf("BLOCK INDEXAA %d\n", block_index);
                 data_blocks ++;
                 if(block_index < 0) {
                     printf("Memory Not available\n");
@@ -369,12 +372,11 @@ int write_i(int inumber, char *data, int length, int offset) {
 
                 if(!allocate_indirect) {
                     // 1. Finding empty data block for indirect pointer
-                    int block_index_indirect = find_empty_data_block(sb, __inode);
+                    block_index_indirect = find_empty_data_block(sb, __inode);
                     if(block_index < 0) {
                         printf("Memory Not available\n");
                         return total - length;
                     }
-                    data_blocks++;
 
                     indirect_pointer = (int *)malloc(1024*sizeof(int));
 
@@ -383,7 +385,10 @@ int write_i(int inumber, char *data, int length, int offset) {
 
                     allocate_indirect = 1;
                 }
-
+                else {
+                    indirect_pointer = (int *)malloc(1024*sizeof(int));
+                    read_block(global_diskptr, sb->data_block_idx + block_index_indirect, (void *)indirect_pointer);
+                }
 
                 // Finding empty block for pointer in indirect
                 block_index = find_empty_data_block(sb, __inode);
@@ -396,6 +401,7 @@ int write_i(int inumber, char *data, int length, int offset) {
                 
                 
                 indirect_pointer[b_index%5] = block_index;
+                write_block(global_diskptr, sb->data_block_idx + block_index_indirect, (void *)indirect_pointer);
             }
         }
         //Find memory block
@@ -412,6 +418,8 @@ int write_i(int inumber, char *data, int length, int offset) {
                 block_index = temp[b_index%5];
             }
         }
+
+        printf("BLOCK INDEX %d\n", block_index);
         // we'll have the pointer to block currently allocated
 
         if(offset >= b_index*BLOCKSIZE && offset < (b_index+1)*BLOCKSIZE) {
@@ -439,6 +447,7 @@ int write_i(int inumber, char *data, int length, int offset) {
             }
             else {
                 printf("FULL WRITE\n");
+                printf("BLOCK INDEX %d\n", block_index);
                 printf("BLOCK WRITE NUMBER %D\n", sb->data_block_idx + block_index);
 
                 // Reading data already existing in block
@@ -465,6 +474,7 @@ int write_i(int inumber, char *data, int length, int offset) {
 }
 
 int read_i(int inumber, char *data, int length, int offset) {
+    printf("\n IN READ_I \n");
     if(global_diskptr == NULL) {
 		return -1;
 	}
@@ -521,9 +531,12 @@ int read_i(int inumber, char *data, int length, int offset) {
         }
         else {
             int* temp = (int *)malloc((BLOCKSIZE/4)*sizeof(int));
+            printf("INDIRECT BLOCK ID %d\n", sb->data_block_idx + __inode->indirect);
             read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
+            printf("TEMPPPPP %d\n", temp[0]);
             block_index = temp[b_index%5];       
         }
+        printf("BLOCK INDEX READ %d\n", block_index);
         if(offset >= b_index*BLOCKSIZE && offset < (b_index+1)*BLOCKSIZE) {
             // Write to block number we found or allocated above 
             // write_to_block_i(data, min(length, (b_index+1)*Blocksize - offset))
