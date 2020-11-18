@@ -302,16 +302,18 @@ int find_empty_data_block(super_block* sb, inode* __inode) {
         // No empty bitmap found :(
             return -1;
     }
+
+    return 0;
 }
 
 
 int write_i(int inumber, char *data, int length, int offset) {
+    //TODO: Set valid bit  1
     printf("\n IN WRITE_I \n");
     if(global_diskptr == NULL) {
 		return -1;
 	}
 
-    int offset_written=0, length_written=0;
 
     // Read Super Block
     char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
@@ -320,6 +322,7 @@ int write_i(int inumber, char *data, int length, int offset) {
     memcpy(sb, c, sizeof(super_block));
     print_superblock_info(sb);
     printf("\n");
+
     // Checking if inumber and offset are valid
     if(!is_valid(sb, inumber, offset)) {
         return -1;
@@ -357,11 +360,11 @@ int write_i(int inumber, char *data, int length, int offset) {
                 // int index = function_to_find_available_data_bitmap_idx()
                 block_index = find_empty_data_block(sb, __inode);
                 printf("BLOCK INDEXAA %d\n", block_index);
-                data_blocks ++;
                 if(block_index < 0) {
                     printf("Memory Not available\n");
                     return total - length;
                 }
+                data_blocks ++;
                 printf("Empty data block index: %d\n", block_index);
                 __inode->direct[b_index] = block_index;
             }
@@ -393,12 +396,12 @@ int write_i(int inumber, char *data, int length, int offset) {
                 // Finding empty block for pointer in indirect
                 block_index = find_empty_data_block(sb, __inode);
                 if(block_index < 0) {
+                    // TODO: if b_index == 5 and data block is not available 
                     printf("Memory Not available\n");
                     return total - length;
                 }
                 data_blocks++;
-
-                
+    
                 
                 indirect_pointer[b_index%5] = block_index;
                 write_block(global_diskptr, sb->data_block_idx + block_index_indirect, (void *)indirect_pointer);
@@ -418,7 +421,7 @@ int write_i(int inumber, char *data, int length, int offset) {
                 block_index = temp[b_index%5];
             }
         }
-
+///////////////////////////////////////////////////////////////////////////////////////////////
         printf("BLOCK INDEX %d\n", block_index);
         // we'll have the pointer to block currently allocated
 
@@ -471,6 +474,7 @@ int write_i(int inumber, char *data, int length, int offset) {
     memcpy(c+(32*inode_i), __inode, sizeof(inode));
     write_block(global_diskptr, inode_block_idx, (void *)c);
 
+    return total - length;
 }
 
 int read_i(int inumber, char *data, int length, int offset) {
@@ -584,10 +588,152 @@ int read_i(int inumber, char *data, int length, int offset) {
     printf("DATA\n");
     printf("TOTAL %d\n", total);
     printf("LENGTH %d\n", length);
+    int count = 0;
     for(int i=0;i<(total - length);++i) {
-        printf("character %c\n", data[i]);
+        if(data[i] == 'a') {
+            count ++;
+        }
+        // printf("character %c\n", data[i]);
     }
+    printf("COUNT: %d\n", count);
     return 0;
 }
 
-int remove_file(int inumber);
+// Util function for handling the data bit map;
+void unset_kth_bit(super_block* sb, int block_index, int offset){
+
+    // 8*BLOCKSIZE - number of bits in one block
+
+    int bitmap_block_i = offset + block_index / 8*BLOCKSIZE;
+    int data_bit_i = block_index % (8*BLOCKSIZE);
+
+    int* A = (int *)calloc(BLOCKSIZE, sizeof(char));
+    if(read_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
+        exit(-1);
+    }
+
+    int int_index = data_bit_i / 32; // one int is 32 bits and thats how bit map is implemented
+    int int_index_bit = data_bit_i % 32; // index of the bit in the int
+
+    A[int_index] ^=  (1 << int_index_bit);
+
+    write_block(global_diskptr, bitmap_block_i, (void *)A);
+}
+
+
+void print_bitmap_info(super_block* sb, int inumber) {
+    int inode_block_idx = sb->inode_block_idx + inumber/128;
+    int inode_i = inumber%128;
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, inode_block_idx, (void *)c);
+    inode* __inode = (inode*)malloc(sizeof(inode));
+    memcpy(__inode, c+(32*inode_i), sizeof(inode));
+
+    printf("VALID BIT %d\n", __inode->valid);
+
+    int bitmap_block_i = 1 + inumber / 8*BLOCKSIZE;
+
+    int* A = (int *)calloc(BLOCKSIZE, sizeof(char));
+    if(read_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
+        exit(-1);
+    }
+
+    int bits_i;
+    int k;
+    int count = 0;
+    for(bits_i = 0; bits_i<BLOCKSIZE/4;bits_i++){
+        for(k=0;k<32;k++){
+            if(( A[(bits_i)] & (1 << k) )){
+                count ++;
+            }
+        }
+    }
+
+    printf("Number of bits set to one in inode bitsmap %d\n", count);
+
+
+    bitmap_block_i = sb->data_block_bitmap_idx;
+
+    A = (int *)calloc(BLOCKSIZE, sizeof(char));
+    if(read_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
+        exit(-1);
+    }
+
+    count = 0;
+    for(bits_i = 0; bits_i<BLOCKSIZE/4;bits_i++){
+        for(k=0;k<32;k++){
+            if(( A[(bits_i)] & (1 << k) )){
+                count ++;
+            }
+        }
+    }
+
+    printf("Number of bits set to one in data bitsmap %d\n", count);
+
+}
+
+int remove_file(int inumber) {
+    
+    printf("\nIN remove_file \n");
+    if(global_diskptr == NULL) {
+		return -1;
+	}
+
+    // Finding super block
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, 0, (void *)c);
+    super_block* sb = (super_block*)malloc(sizeof(super_block));
+    memcpy(sb, c, sizeof(super_block));
+    print_bitmap_info(sb, inumber);
+    // Checking if inumber and offset are valid
+    // if(!is_valid(global_diskptr, sb, inumber)) {
+    //     return -1;
+    // }
+
+    //Finding the required __innode
+    int inode_block_idx = sb->inode_block_idx + inumber/128;
+    int inode_i = inumber%128;
+    c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    read_block(global_diskptr, inode_block_idx, (void *)c);
+    inode* __inode = (inode*)malloc(sizeof(inode));
+    memcpy(__inode, c+(32*inode_i), sizeof(inode));
+
+    // Valid Bit -> 0
+    __inode->valid = 0;
+
+    // Update the indode
+    memcpy(c+(32*inode_i), __inode, sizeof(inode));
+    write_block(global_diskptr, inode_block_idx, (void *)c);
+
+    int data_blocks = ceil(__inode->size, BLOCKSIZE);    
+    int b_index = 0;
+    int indirect_block_id;
+    int block_index;
+
+    int* temp;
+    // get the Inode indirect pointer data
+    if(data_blocks > 5) {
+        indirect_block_id = __inode->indirect;
+        temp = (int *)malloc((BLOCKSIZE/4)*sizeof(int));
+        read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
+    }
+
+    while(b_index < data_blocks) {
+        if(b_index < 5) {
+            block_index = __inode->direct[b_index];
+        }
+        else {
+            block_index = temp[b_index%5];
+        }
+        unset_kth_bit(sb, block_index, sb->data_block_bitmap_idx);
+        b_index++;
+    }
+
+    unset_kth_bit(sb, indirect_block_id, sb->data_block_bitmap_idx); // Unsetting the bit for indirect pointer
+
+    unset_kth_bit(sb, inumber, 1); //Unsetting the bit in inode bit map
+
+    print_bitmap_info(sb, inumber);
+    return 0;
+
+}

@@ -64,14 +64,19 @@ int main(){
 		printf("File creation unsuccessfull\n");
 		exit(-1);
 	}
-
-	char* a = (char *)malloc(3*sizeof(char));
-	a[0] = 'm';
-	a[1] = 'n';
-	a[2] = 'q';
-	if(write_i(0, a, 3, 5*BLOCKSIZE-1) < 0) {
+	int Size = (BLOCKSIZE + BLOCKSIZE/2);
+	char* a = (char *)malloc(Size*sizeof(char));
+	int count = 0;
+	for(int i=0;i<Size;++i) {
+		a[i] = 'a' + i%26;
+		if(a[i] == 'a')
+			count ++;
+	}
+	printf("COUNT init: %d\n", count);
+	if(write_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2) < 0) {
 		printf("Write Unsuccessfull\n");
 	}
-	read_i(0, a, 3, 5*BLOCKSIZE-1);
+	read_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2);
+	remove_file(0);
 	return 0;
 }
