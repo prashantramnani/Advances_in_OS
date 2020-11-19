@@ -1,7 +1,7 @@
 #include<stdint.h>
 
 const static uint32_t MAGIC = 12345;
-
+const static uint32_t entries_per_block = BLOCKSIZE/32;
 
 typedef struct inode {
 	uint32_t valid; // 0 if invalid
@@ -25,6 +25,12 @@ typedef struct super_block {
 	uint32_t data_blocks;  // Number of blocks reserved as data blocks
 } super_block;
 
+
+typedef struct dir_entry {
+	uint32_t inode;		// 4 byte
+	uint8_t meta_data; 	//1 byte
+	char filename[27];	// 27 byte
+} dir_entry;
 
 int format(disk *diskptr);
 

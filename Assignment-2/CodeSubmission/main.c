@@ -78,5 +78,8 @@ int main(){
 	}
 	read_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2);
 	remove_file(0);
+
+	char filepath[] = "/direc/asd/asd/asd/asd/asda"; 
+	// create_dir(&filepath);
 	return 0;
 }
