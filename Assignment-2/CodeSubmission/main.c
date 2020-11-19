@@ -60,26 +60,68 @@ int main(){
 	}
 
 	printf("Mount successfull\n");
-	if(create_file() < 0 ) {
-		printf("File creation unsuccessfull\n");
-		exit(-1);
+	// if(create_file() < 0 ) {
+	// 	printf("File creation unsuccessfull\n");
+	// 	exit(-1);
+	// }
+	// int Size = (BLOCKSIZE + BLOCKSIZE/2);
+	// char* a = (char *)malloc(Size*sizeof(char));
+	// int count = 0;
+	// for(int i=0;i<Size;++i) {
+	// 	a[i] = 'a' + i%26;
+	// 	if(a[i] == 'a')
+	// 		count ++;
+	// }
+	// printf("COUNT init: %d\n", count);
+	// if(write_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2) < 0) {
+	// 	printf("Write Unsuccessfull\n");
+	// }
+	// read_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2);
+	// remove_file(0);
+	printf("####################################################################\n");
+	char* filepath = "/dir1"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
 	}
-	int Size = (BLOCKSIZE + BLOCKSIZE/2);
-	char* a = (char *)malloc(Size*sizeof(char));
-	int count = 0;
-	for(int i=0;i<Size;++i) {
-		a[i] = 'a' + i%26;
-		if(a[i] == 'a')
-			count ++;
-	}
-	printf("COUNT init: %d\n", count);
-	if(write_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2) < 0) {
-		printf("Write Unsuccessfull\n");
-	}
-	read_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2);
-	remove_file(0);
 
-	char filepath[] = "/direc/asd/asd/asd/asd/asda"; 
-	// create_dir(&filepath);
+	printf("####################################################################\n");
+	filepath = "/dir2"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	printf("####################################################################\n");
+	filepath = "/dir3"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	printf("####################################################################\n");
+	filepath = "/dir1/dir1.1"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	filepath = "/dir1/dir1.1/dir1.1.1"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	filepath = "/dir1/dir1.1/dir1.1.2"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	filepath = "/dir2/dir2.1"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	filepath = "/dir3/dir3.1"; 
+	if(create_dir(filepath) < 0) {
+		printf("Error in creation of directory");
+	}
+
+	printf("END\n");
 	return 0;
 }
