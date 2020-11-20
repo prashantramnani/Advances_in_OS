@@ -1,5 +1,9 @@
 main: main.o disk.o sfs.o
-	gcc -o main main.o disk.o sfs.o 
+	gcc -o main main.o disk.o sfs.o
+sodhi: sodhi.o disk.o sfs.o
+	gcc -o sodhi sodhi.o disk.o sfs.o	 
+sodhi.o: sodhi.c disk.h sfs.h
+	gcc -c -g sodhi.c	
 main.o: main.c disk.h sfs.h
 	gcc -c -g main.c
 sfs.o: sfs.c sfs.h

@@ -47,9 +47,9 @@ void total_size_check(disk* diskptr, int size) {
 }
 
 int main(){
-	disk* new_disk = (disk *)malloc(sizeof(disk));
 	int size = 200000;
-	if(create_disk(new_disk, size) < 0) {
+	disk* new_disk = create_disk(size);
+	if(new_disk == NULL) {
 		printf("Error in creating disk\n");
 		exit(-1);
 	}
@@ -78,69 +78,69 @@ int main(){
 	// }
 	// read_i(0, a, Size, 5*BLOCKSIZE + BLOCKSIZE/2);
 	// remove_file(0);
-	printf("####################################################################\n");
-	char* filepath = "/dir1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// printf("####################################################################\n");
+	// char* filepath = "/dir1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	printf("####################################################################\n");
-	filepath = "/dir2"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// printf("####################################################################\n");
+	// filepath = "/dir2"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	printf("####################################################################\n");
-	filepath = "/dir3"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// printf("####################################################################\n");
+	// filepath = "/dir3"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	printf("####################################################################\n");
-	filepath = "/dir1/dir1.1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// printf("####################################################################\n");
+	// filepath = "/dir1/dir1.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir1/dir1.1/dir1.1.1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir1/dir1.1/dir1.1.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir1/dir1.1/dir1.1.2"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir1/dir1.1/dir1.1.2"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir2/dir2.1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir2/dir2.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir3/dir3.1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir3/dir3.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir1/dir1.1"; 
-	remove_dir(filepath);
+	// filepath = "/dir1/dir1.1"; 
+	// remove_dir(filepath);
 
-	filepath = "/dir1/dir3.1"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir1/dir3.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir2/dir2.2"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir2/dir2.2"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir3/dir3.2"; 
-	if(create_dir(filepath) < 0) {
-		printf("Error in creation of directory");
-	}
+	// filepath = "/dir3/dir3.2"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
 
-	filepath = "/dir1/dir3.1/a.txt"; 
+	char* filepath = "/a.txt"; 
 	char *data = (char *)malloc(2);
 	data[0] = 'a';
 	data[1] = 'b';
@@ -149,13 +149,13 @@ int main(){
 	}
 
 	char *read = (char *)malloc(2);
-	filepath = "/dir1/dir3.1/a.txt"; 
+	filepath = "/a.txt"; 
 	if(read_file(filepath, read, 2, 0) < 0) {
 		printf("Error in creation of directory");
 	}
 	printf("READ DATA %c%c\n", read[0], read[1]);
 
-	filepath = "/dir1/dir3.1/a.txt"; 
+	filepath = "/a.txt"; 
 	char *data1 = (char *)malloc(3);
 	data1[0] = 'z';
 	data1[1] = 'y';
@@ -165,7 +165,7 @@ int main(){
 	}
 
 	char *read1 = (char *)malloc(5);
-	filepath = "/dir1/dir3.1/a.txt"; 
+	filepath = "/a.txt"; 
 	if(read_file(filepath, read1, 5, 0) < 0) {
 		printf("Error in creation of directory");
 	}

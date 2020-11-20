@@ -3,17 +3,18 @@
 #include <string.h>
 #include "disk.h"
 
-int create_disk(disk *diskptr, int nbytes){
+disk* create_disk(int nbytes){
 	
-	if(diskptr==NULL)
-		return -1;
+	disk* diskptr = (disk *)malloc(sizeof(disk));
+	// if(diskptr==NULL)
+	// 	return -1;
 
 	diskptr->size = 0;
 	diskptr->blocks=0;
 
 	int usable_size = nbytes - 24;
 	if(usable_size < BLOCKSIZE){
-		return -1;
+		return NULL;
 	}
 
 	diskptr->size = nbytes;
@@ -23,7 +24,7 @@ int create_disk(disk *diskptr, int nbytes){
 	for(int i=0;i<diskptr->blocks;i++)
 		diskptr->block_arr[i] = (char*)malloc(BLOCKSIZE*sizeof(char));
 
-	return 0;
+	return diskptr;
 }
 
 int read_block(disk *diskptr, int blocknr, void *block_data){
