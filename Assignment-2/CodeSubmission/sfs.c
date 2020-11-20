@@ -520,7 +520,7 @@ int write_i(int inumber, char *data, int length, int offset) {
 }
 
 int read_i(int inumber, char *data, int length, int offset) {
-    printf("\n IN READ_I \n");
+    // printf("\n IN READ_I \n");
     if(global_diskptr == NULL) {
 		return -1;
 	}
@@ -557,18 +557,18 @@ int read_i(int inumber, char *data, int length, int offset) {
     int block_index;
 
     while(length > 0) {
-        printf("Length left in bytes: %d\n", length);
+        // printf("Length left in bytes: %d\n", length);
         // we'll have the pointer to block currently allocated
 
         if(b_index >= data_blocks) {
-            printf("Complete File Read\n");
-            printf("DATA\n");
-            printf("%c\n", data[0]);
-            printf("TOTAL %d\n", total);
-            printf("LENGTH %d\n", length);
-            for(int i=0;i<(total - length);++i) {
-                printf("%c\n", data[i]);
-            }
+            // printf("Complete File Read\n");
+            // printf("DATA\n");
+            // printf("%c\n", data[0]);
+            // printf("TOTAL %d\n", total);
+            // printf("LENGTH %d\n", length);
+            // for(int i=0;i<(total - length);++i) {
+            //     printf("%c\n", data[i]);
+            // }
             return 0;
         }
 
@@ -577,12 +577,12 @@ int read_i(int inumber, char *data, int length, int offset) {
         }
         else {
             int* temp = (int *)malloc((BLOCKSIZE/4)*sizeof(int));
-            printf("INDIRECT BLOCK ID %d\n", sb->data_block_idx + __inode->indirect);
+            // printf("INDIRECT BLOCK ID %d\n", sb->data_block_idx + __inode->indirect);
             read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
-            printf("TEMPPPPP %d\n", temp[0]);
+            // printf("TEMPPPPP %d\n", temp[0]);
             block_index = temp[b_index -5];       
         }
-        printf("BLOCK INDEX READ %d\n", block_index);
+        // printf("BLOCK INDEX READ %d\n", block_index);
         if(offset >= b_index*BLOCKSIZE && offset < (b_index+1)*BLOCKSIZE) {
             // Write to block number we found or allocated above 
             // write_to_block_i(data, min(length, (b_index+1)*Blocksize - offset))
@@ -592,7 +592,7 @@ int read_i(int inumber, char *data, int length, int offset) {
 
             if((b_index+1)*BLOCKSIZE - offset < BLOCKSIZE) {
                 // Partial Write
-                printf("PARTIAL READ\n");
+                // printf("PARTIAL READ\n");
 
                 int block_offset = (b_index+1)*BLOCKSIZE - offset;
 
@@ -606,15 +606,15 @@ int read_i(int inumber, char *data, int length, int offset) {
                 
             }
             else {
-                printf("FULL READ\n");
-                printf("BLOCK WRITE NUMBER %d\n", sb->data_block_idx + block_index);
+                // printf("FULL READ\n");
+                // printf("BLOCK WRITE NUMBER %d\n", sb->data_block_idx + block_index);
 
                 // Reading data already existing in block
                 char* temp = (char *)malloc(BLOCKSIZE*sizeof(char));
                 read_block(global_diskptr, sb->data_block_idx + block_index, (void *)temp);
 
                 // Overwriting the required part
-                printf("MINN %d\n", min(length, BLOCKSIZE));
+                // printf("MINN %d\n", min(length, BLOCKSIZE));
                 memcpy(traverse, temp, min(length, BLOCKSIZE));
                 
                 length -= min(length, BLOCKSIZE);
@@ -626,10 +626,10 @@ int read_i(int inumber, char *data, int length, int offset) {
         b_index++;
     }
 
-    printf("Complete length Read\n");
-    printf("DATA\n");
-    printf("TOTAL %d\n", total);
-    printf("LENGTH %d\n", length);
+    // printf("Complete length Read\n");
+    // printf("DATA\n");
+    // printf("TOTAL %d\n", total);
+    // printf("LENGTH %d\n", length);
     int count = 0;
     for(int i=0;i<(total - length);++i) {
         if(data[i] == 'a') {
@@ -637,7 +637,7 @@ int read_i(int inumber, char *data, int length, int offset) {
         }
         // printf("character %c\n", data[i]);
     }
-    printf("COUNT: %d\n", count);
+    // printf("COUNT: %d\n", count);
     return 0;
 }
 
@@ -645,7 +645,6 @@ int read_i(int inumber, char *data, int length, int offset) {
 void unset_kth_bit(super_block* sb, int block_index, int offset){
 
     // 8*BLOCKSIZE - number of bits in one block
-
     int bitmap_block_i = offset + block_index / 8*BLOCKSIZE;
     int data_bit_i = block_index % (8*BLOCKSIZE);
 
@@ -654,11 +653,7 @@ void unset_kth_bit(super_block* sb, int block_index, int offset){
         exit(-1);
     }
 
-    int int_index = data_bit_i / 32; // one int is 32 bits and thats how bit map is implemented
-    int int_index_bit = data_bit_i % 32; // index of the bit in the int
-
-    A[int_index] ^=  (1 << int_index_bit);
-
+    A[(data_bit_i/32)] &= ~(1 << (data_bit_i%32));
     write_block(global_diskptr, bitmap_block_i, (void *)A);
 }
 
@@ -717,16 +712,15 @@ void print_bitmap_info(super_block* sb, int inumber) {
 int remove_file(int inumber) {
     
     printf("\nIN remove_file \n");
+    printf("%d\n", inumber);
     if(global_diskptr == NULL) {
 		return -1;
 	}
 
     // Finding super block
-    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
-    read_block(global_diskptr, 0, (void *)c);
-    super_block* sb = (super_block*)malloc(sizeof(super_block));
-    memcpy(sb, c, sizeof(super_block));
-    print_bitmap_info(sb, inumber);
+    super_block* sb = find_super_block();
+    
+    // print_bitmap_info(sb, inumber);
     // Checking if inumber and offset are valid
     // TODO
     // if(!is_valid(global_diskptr, sb, inumber)) {
@@ -736,7 +730,7 @@ int remove_file(int inumber) {
     //Finding the required __innode
     int inode_block_idx = sb->inode_block_idx + inumber/128;
     int inode_i = inumber%128;
-    c = (char *)malloc(BLOCKSIZE*sizeof(char));
+    char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(global_diskptr, inode_block_idx, (void *)c);
     inode* __inode = (inode*)malloc(sizeof(inode));
     memcpy(__inode, c+(32*inode_i), sizeof(inode));
@@ -772,11 +766,13 @@ int remove_file(int inumber) {
         b_index++;
     }
 
-    unset_kth_bit(sb, indirect_block_id, sb->data_block_bitmap_idx); // Unsetting the bit for indirect pointer
+    if(data_blocks > 5) {
+        unset_kth_bit(sb, indirect_block_id, sb->data_block_bitmap_idx); // Unsetting the bit for indirect pointer
+    }
 
     unset_kth_bit(sb, inumber, 1); //Unsetting the bit in inode bit map
 
-    print_bitmap_info(sb, inumber);
+    // print_bitmap_info(sb, inumber);
     return 0;
 
 }
@@ -864,55 +860,13 @@ void insert_dir_entry(super_block* sb, int prev_inode, int new_dir_inode, char* 
     int offset = __inode->size;
     write_i(prev_inode, (char *)de, sizeof(dir_entry), offset);
 
-    // while(b_index < data_blocks) {
-    //     if(b_index < 5) {
-    //         int d_block = __inode->direct[b_index];
-    //         read_block(global_diskptr, sb->data_block_idx + d_block, (void *)de);
-
-    //         for(int i=0;i<entries_per_block;++i) {
-    //             if(!(de[i].meta_data & 1)) {
-    //                 de[i].meta_data |= 1;
-    //                 de[i].meta_data |= (type << 1);
-    //                 de[i].meta_data |= (strlen(filename) << 2);
-
-    //                 strcpy(de[i].filename, filename);
-    //                 de[i].inode = new_dir_inode; 
-
-    //                 write_block(global_diskptr, sb->data_block_idx + d_block, (void *)de);  
-    //                 return ; 
-    //             }
-    //         }
-    //     }
-    //     else {
-    //         int* temp = (int *)malloc((BLOCKSIZE/4)*sizeof(int));
-    //         read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
-    //         int d_block = temp[b_index - 5];  
-
-    //         read_block(global_diskptr, sb->data_block_idx + d_block, (void *)de);
-
-    //         for(int i=0;i<entries_per_block;++i) {
-    //             if(!(de[i].meta_data & 1)) {
-    //                 de[i].meta_data |= 1;
-    //                 de[i].meta_data |= (type << 1);
-    //                 de[i].meta_data |= (strlen(filename) << 2);
-
-    //                 strcpy(de[i].filename, filename);
-    //                 de[i].inode = new_dir_inode; 
-
-    //                 write_block(global_diskptr, sb->data_block_idx + d_block, (void *)de);  
-    //                 return ; 
-    //             }
-    //         }
-    //     }
-    //     b_index ++ ;
-    // }
-
 }
 
 void print_rootdir_data(super_block* sb, int inumber) {
     printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
     inode* __inode = find_inode(sb, inumber);
     char* temp = (char *)malloc(__inode->size);
+    printf("INODE: %d\n", inumber);
     printf("INODE SIZE: %d\n", __inode->size);
     
     read_i(inumber, temp, __inode->size, 0);
@@ -966,8 +920,6 @@ int create_dir(char *dir) {
         if(dir[string_i]!='\0'){
             // intermediate dir DNE 
             // ERROR
-            
-            printf("WHAJSHD %s\n", filename);
             return -1;
         }
         else{
@@ -982,18 +934,187 @@ int create_dir(char *dir) {
 
 
     print_rootdir_data(sb, 0);
-    // We have the directiry in which we need to create a directory
-    // find next empty data block
-    // assign it a directory with de strcts
-    // update the current inode
-    // update the inode bitmap for new file 
+    return 0;
+}
+
+int write_file(char *dir, char *data, int length, int offset) {
+    // Parse Filepath
+    // If file does not exist then create a file and return inode or else just return inode
+    // do write_i for file with given legth and offset
+    
+
+    super_block* sb = find_super_block();
+
+    int curr_inode = 0, prev_inode = curr_inode;
+    int string_i = 0;
+    char filename[27];
+
+    while(dir[string_i]!='\0'){        
+
+        while(dir[string_i]=='/'){
+            string_i++;
+        }    
+        int start = string_i, final=start;
+        while(dir[string_i]!='/' && dir[string_i]!='\0'){
+            string_i++;
+        }
+        final=string_i-1;
+
+        memset(filename, '\0', 27);
+
+        int i;
+        for(i=0;i<26 && start+i<=final;i++){
+            filename[i] = dir[start+i];
+        }
+        filename[i]='\0';
+        printf("%s \t %d\n", filename, curr_inode);
+
+        prev_inode = curr_inode;
+        curr_inode = find_file(sb, curr_inode, filename, 1);
+        if(curr_inode<0){
+            break;
+        }
+    }
+
+    if(curr_inode<0){
+        if(dir[string_i]!='\0'){
+            // intermediate dir DNE 
+            // ERROR
+            return -1;
+        }
+        else{
+            // CREATE FILE at curr inode with filename
+            printf("Filename - %s\n", filename);
+
+            int new_dir_inode = create_file();
+            printf("NEW DIR INDOE %d\n", new_dir_inode);
+            insert_dir_entry(sb, prev_inode, new_dir_inode, filename, 0);
+
+            write_i(new_dir_inode, data, length, offset);
+        }
+    }
+    else {
+        write_i(curr_inode, data, length, offset);
+    }
+    print_rootdir_data(sb, 0);
+    return 0;
+}
+
+int read_file(char *dir, char *data, int length, int offset) {
+    // parse filepath and check if file exists
+    // return -1 if does not exist
+    // find inode of file
+    // read_i 
+    
+    super_block* sb = find_super_block();
+
+    int curr_inode = 0, prev_inode = curr_inode;
+    int string_i = 0;
+    char filename[27];
+
+    while(dir[string_i]!='\0'){        
+
+        while(dir[string_i]=='/'){
+            string_i++;
+        }    
+        int start = string_i, final=start;
+        while(dir[string_i]!='/' && dir[string_i]!='\0'){
+            string_i++;
+        }
+        final=string_i-1;
+
+        memset(filename, '\0', 27);
+
+        int i;
+        for(i=0;i<26 && start+i<=final;i++){
+            filename[i] = dir[start+i];
+        }
+        filename[i]='\0';
+        printf("%s \t %d\n", filename, curr_inode);
+
+        prev_inode = curr_inode;
+        curr_inode = find_file(sb, curr_inode, filename, 1);
+        if(curr_inode<0){
+            break;
+        }
+    }
+
+    if(curr_inode<0){
+        
+        printf("FILE NOT FOUND\n");
+    }
+    else {
+        read_i(curr_inode, data, length, offset);
+    }
 
     return 0;
 }
 
-int remove_dir(char *dirpath);
+void delete_recursive(super_block* sb, int inumber) {
+    inode* __inode = find_inode(sb, inumber);
+    char* temp = (char *)malloc(__inode->size);
+    printf("INODE SIZE: %d\n", __inode->size);
+    
+    read_i(inumber, temp, __inode->size, 0);
+    // dir_entry d;
+    // memcpy(&d, temp + i*32, 32);
+    for(int i=0;i < __inode->size/32;++i) {
+        dir_entry de;
+        memcpy(&de, temp + i*32, 32);
+        if(__inode->size > 0) {
+            delete_recursive(sb, de.inode);
+        }
+    }
+    printf("REMOVING FILENAME WITH INODE: %d\n", inumber);
+    int x = remove_file(inumber);
+    // printf("FILE NAME IN ROOT %s\n", de.filename);
+}
 
-int write_file(char *filepath, char *data, int length, int offset);
+int remove_dir(char *dir) {
+    // parse filepath and check if dir exist
 
-int read_file(char *filepath, char *data, int length, int offset);
+
+    super_block* sb = find_super_block();
+
+    int curr_inode = 0, prev_inode = curr_inode;
+    int string_i = 0;
+    char filename[27];
+
+    while(dir[string_i]!='\0'){        
+
+        while(dir[string_i]=='/'){
+            string_i++;
+        }    
+        int start = string_i, final=start;
+        while(dir[string_i]!='/' && dir[string_i]!='\0'){
+            string_i++;
+        }
+        final=string_i-1;
+
+        memset(filename, '\0', 27);
+
+        int i;
+        for(i=0;i<26 && start+i<=final;i++){
+            filename[i] = dir[start+i];
+        }
+        filename[i]='\0';
+        printf("%s \t %d\n", filename, curr_inode);
+
+        prev_inode = curr_inode;
+        curr_inode = find_file(sb, curr_inode, filename, 1);
+        if(curr_inode<0){
+            break;
+        }
+    }
+
+    if(curr_inode < 0) {
+        printf("INVALID PATH\n");
+        return -1;
+    }
+
+    delete_recursive(sb, curr_inode);
+
+    // TODO set entry invalid        
+    print_rootdir_data(sb, 0);    
+}
 

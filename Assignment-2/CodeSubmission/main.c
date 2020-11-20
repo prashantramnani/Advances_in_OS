@@ -122,6 +122,21 @@ int main(){
 		printf("Error in creation of directory");
 	}
 
+	filepath = "/dir1/dir1.1"; 
+	remove_dir(filepath);
+
+	// filepath = "/dir1/dir3.1"; 
+	// if(create_dir(filepath) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
+
+	// filepath = "/dir1/dir3.1/a.txt"; 
+	// char data[1];
+	// data[0] = 'a';
+	// if(write_file(filepath, &data, 1, 0) < 0) {
+	// 	printf("Error in creation of directory");
+	// }
+
 	printf("END\n");
 	return 0;
 }
