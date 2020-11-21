@@ -38,13 +38,13 @@ void print_superblock_info(super_block* sb) {
 void init_superblock(disk* diskptr, super_block* sb) {
     int M = diskptr->blocks - 1; 
     int I = 0.1*M; 
-    int IB = (I*128) / (8*4096);
-    if((I*128)%(8*4096) != 0) {
+    int IB = (I*INODES_PER_BLOCK) / (8*BLOCKSIZE);
+    if((I*INODES_PER_BLOCK)%(8*BLOCKSIZE) != 0) {
         IB ++ ;
     }
     int R = M - I - IB;
-    int DBB = (R) / (8*4096);
-    if((R%(8*4096)) != 0) {
+    int DBB = (R) / (8*BLOCKSIZE);
+    if((R%(8*BLOCKSIZE)) != 0) {
         DBB++ ;
     }
     int DB = R - DBB;
@@ -53,7 +53,7 @@ void init_superblock(disk* diskptr, super_block* sb) {
     sb->blocks = M; 
 
     sb->inode_blocks = I;
-    sb->inodes = I * 128;
+    sb->inodes = I * INODES_PER_BLOCK;
     sb->inode_bitmap_block_idx = 1;
     sb->inode_block_idx = 1 + IB + DBB;
 
@@ -64,7 +64,7 @@ void init_superblock(disk* diskptr, super_block* sb) {
 }
 
 void init_inode_block(super_block* sb, inode* inodes) {
-    for(int i=0;i<128;++i) {
+    for(int i=0;i<INODES_PER_BLOCK;++i) {
         inodes[i].valid = 0;
         inodes[i].size = 0;
     }
@@ -72,9 +72,9 @@ void init_inode_block(super_block* sb, inode* inodes) {
 
 void print_inode_info(disk* diskptr, super_block* sb) {
     for(int i=0;i<sb->inode_blocks;++i) {
-        inode* x = (inode *)malloc(128*sizeof(inode));
+        inode* x = (inode *)malloc(INODES_PER_BLOCK*sizeof(inode));
         read_block(diskptr, sb->inode_block_idx + i, (void *)x);
-        for(int j=0;j<128;++j) {
+        for(int j=0;j<INODES_PER_BLOCK;++j) {
             printf("READING: %d\n", x[j].valid);    
         }
     }
@@ -97,7 +97,7 @@ int format(disk *diskptr) {
     free(C);
 
     // initialize inode
-    inode* inodes = (inode *)malloc(128 * sizeof(inode));
+    inode* inodes = (inode *)malloc(INODES_PER_BLOCK * sizeof(inode));
     init_inode_block(sb, inodes);
     // Setting values for root directory
     inodes[0].valid = 1;
@@ -152,8 +152,8 @@ super_block* find_super_block() {
 
 inode* find_inode(super_block* sb, int inumber) {
     // Finding the respective inode
-    int inode_block_idx = sb->inode_block_idx + inumber/128;
-    int inode_i = inumber%128;
+    int inode_block_idx = sb->inode_block_idx + inumber/INODES_PER_BLOCK;
+    int inode_i = inumber%INODES_PER_BLOCK;
     char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(global_diskptr, inode_block_idx, (void *)c);
     inode* __inode = (inode*)malloc(sizeof(inode));
@@ -235,11 +235,11 @@ int create_file() {
         if(flag){
             // Bitmap found
             // Update inode
-            // 1024*32*bitmap_block_i + 32*bits_i + k
+            // NUM_INDIRECT_PTR*32*bitmap_block_i + 32*bits_i + k
             //printf("KK %d\n", k);
             int inode_idx = BLOCKSIZE*8*(bitmap_block_i-1) + 32*bits_i + k;
-            int inode_block_idx = sb->inode_block_idx + inode_idx/128;
-            int inode_i = inode_idx%128;
+            int inode_block_idx = sb->inode_block_idx + inode_idx/INODES_PER_BLOCK;
+            int inode_i = inode_idx%INODES_PER_BLOCK;
         
             char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
             read_block(global_diskptr, inode_block_idx, (void *)c);
@@ -288,6 +288,9 @@ int stat(int inumber) {
     int num_indirect_pointer = (logical_size <= 5*BLOCKSIZE) ? 0 : 1;
     int data_blocks = ceil(logical_size,(BLOCKSIZE));
 
+    if(data_blocks>=5) {
+        data_blocks++;
+    }
     printf("Logical Size: %d\n", __inode->size);
     printf("Valid Bit: %d\n", __inode->valid);
     printf("Number of Direct Pointers: %d\n", num_direct_pointer);
@@ -303,13 +306,14 @@ int is_valid(super_block* sb, int inumber, int offset) {
         return 0;
     }
 
-    if(offset >= 1029*BLOCKSIZE || offset < 0) {
+    if(offset >= (5 + NUM_INDIRECT_PTR)*BLOCKSIZE || offset < 0) {
         return 0;
     }
     return 1;
 }
 
 int find_empty_data_block(super_block* sb) {
+    int x = 0;
     int data_bitmap_block_i=sb->data_block_bitmap_idx, bits_i=0, flag=0;
 
     for(; data_bitmap_block_i < sb->inode_block_idx ; data_bitmap_block_i++){
@@ -321,6 +325,10 @@ int find_empty_data_block(super_block* sb) {
         int k=0;
         for(bits_i = 0; bits_i<BLOCKSIZE/4;bits_i++){
             for(k=0;k<32;k++){
+                x++;
+                if(x>=sb->data_blocks){
+                    return -1;
+                }
                 if(!( A[(bits_i)] & (1 << k) )){
                     // Unset Bit found
                     A[bits_i] |= (1 << k);
@@ -366,8 +374,11 @@ int write_i(int inumber, char *data, int length, int offset) {
         return -1;
     }
 
-    int inode_block_idx = sb->inode_block_idx + inumber/128;
-    int inode_i = inumber%128;
+    if(length <= 0) {
+        return 0;
+    }
+    int inode_block_idx = sb->inode_block_idx + inumber/INODES_PER_BLOCK;
+    int inode_i = inumber%INODES_PER_BLOCK;
     
     char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(global_diskptr, inode_block_idx, (void *)c);
@@ -392,14 +403,17 @@ int write_i(int inumber, char *data, int length, int offset) {
 
     while(length > 0) {
         // Allocating block memory if not there
+        // printf("b_index: %d \t data_blocks: %d\n", b_index, data_blocks);
         if(b_index >= data_blocks) {
             if(b_index < 5) {
                 // Allocate direct pointer
                 // int index = function_to_find_available_data_bitmap_idx()
                 block_index = find_empty_data_block(sb);
+                // printf("EMPTY DIRECT BLOCK INDEX: %d\n", block_index);
                 if(block_index < 0) {
                     printf("Memory Not Available\n");
-                    return total - length;
+                    break;
+                    // return total - length;
                 }
                 data_blocks ++;
                 __inode->direct[b_index] = block_index;
@@ -412,12 +426,14 @@ int write_i(int inumber, char *data, int length, int offset) {
                 if(!allocate_indirect) {
                     // 1. Finding empty data block for indirect pointer
                     block_index_indirect = find_empty_data_block(sb);
+                    // printf("EMPTY INDIRECT BLOCK INDEX: %d\n", block_index_indirect);
                     if(block_index < 0) {
                         printf("Memory Not Available\n");
-                        return total - length;
+                        break;
+                        // return total - length;
                     }
 
-                    indirect_pointer = (int *)malloc(1024*sizeof(int));
+                    indirect_pointer = (int *)malloc(NUM_INDIRECT_PTR*sizeof(int));
 
                     write_block(global_diskptr, sb->data_block_idx + block_index_indirect, (void *)indirect_pointer);
                     __inode->indirect = block_index_indirect;
@@ -425,16 +441,20 @@ int write_i(int inumber, char *data, int length, int offset) {
                     allocate_indirect = 1;
                 }
                 else {
-                    indirect_pointer = (int *)malloc(1024*sizeof(int));
+                    indirect_pointer = (int *)malloc(NUM_INDIRECT_PTR*sizeof(int));
                     read_block(global_diskptr, sb->data_block_idx + block_index_indirect, (void *)indirect_pointer);
                 }
 
                 // Finding empty block for pointer in indirect
                 block_index = find_empty_data_block(sb);
+                // printf("EMPTY INDIRECT BLOCK PTR INDEX: %d\n", block_index);
                 if(block_index < 0) {
-                    unset_kth_bit(sb, sb->data_block_bitmap_idx + block_index_indirect/(8*BLOCKSIZE), block_index_indirect%(8*BLOCKSIZE));
+                    if(data_blocks == 5){
+                        unset_kth_bit(sb, sb->data_block_bitmap_idx + block_index_indirect/(8*BLOCKSIZE), block_index_indirect%(8*BLOCKSIZE));
+                    }
                     printf("Memory Not Available\n");
-                    return total - length;
+                    break;
+                    // return total - length;
                 }
                 data_blocks++;
                 
@@ -500,6 +520,9 @@ int write_i(int inumber, char *data, int length, int offset) {
     // max(offset + length, data_blocks*BLOCKSIZE)
     int size = max(__inode->size, min(offset, data_blocks*BLOCKSIZE));
     __inode->size = size;
+    // for(int i=0;i<2;++i) {
+        // printf("direct pointers: %d\n", __inode->direct[i]);
+    // }
     memcpy(c+(32*inode_i), __inode, sizeof(inode));
     write_block(global_diskptr, inode_block_idx, (void *)c);
 
@@ -520,6 +543,9 @@ int read_i(int inumber, char *data, int length, int offset) {
         return -1;
     }
 
+    if(length <= 0) {
+        return 0;
+    }
     //Finding the required __innode
     inode* __inode = find_inode(sb, inumber);
     if(__inode->valid == 0) {
@@ -537,6 +563,9 @@ int read_i(int inumber, char *data, int length, int offset) {
 
     while(length > 0) {
         // we'll have the pointer to block currently allocated
+        if(b_index >= data_blocks) {
+            break;
+        }
         if(b_index < 5) {
             block_index = __inode->direct[b_index];        
         }
@@ -545,7 +574,7 @@ int read_i(int inumber, char *data, int length, int offset) {
             read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
             block_index = temp[b_index -5];       
         }
-
+        printf("block_index: %d\n", block_index);
         if(offset >= b_index*BLOCKSIZE && offset < (b_index+1)*BLOCKSIZE) {
             // Write to block number we found or allocated above 
             // write_to_block_i(data, min(length, (b_index+1)*Blocksize - offset))
@@ -559,12 +588,11 @@ int read_i(int inumber, char *data, int length, int offset) {
 
                 char* temp = (char *)malloc(BLOCKSIZE*sizeof(char));
                 read_block(global_diskptr, sb->data_block_idx + block_index, (void *)temp);
-
+                printf("off: %d\n", offset - b_index*BLOCKSIZE);
                 memcpy(traverse, temp + offset - b_index*BLOCKSIZE, min(length, block_offset));
 
-                length -= min(length, block_offset);
                 traverse += min(length, block_offset);
-                
+                length -= min(length, block_offset);
             }
             else {
                 // FULL READ
@@ -575,8 +603,8 @@ int read_i(int inumber, char *data, int length, int offset) {
                 // Overwriting the required part
                 memcpy(traverse, temp, min(length, BLOCKSIZE));
                 
-                length -= min(length, BLOCKSIZE);
                 traverse += min(length, BLOCKSIZE);
+                length -= min(length, BLOCKSIZE);
             }
             offset = (b_index + 1)*BLOCKSIZE;
         }
@@ -605,8 +633,8 @@ void unset_kth_bit(super_block* sb, int block_index, int offset){
 
 
 void print_bitmap_info(super_block* sb, int inumber) {
-    int inode_block_idx = sb->inode_block_idx + inumber/128;
-    int inode_i = inumber%128;
+    int inode_block_idx = sb->inode_block_idx + inumber/INODES_PER_BLOCK;
+    int inode_i = inumber%INODES_PER_BLOCK;
     char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(global_diskptr, inode_block_idx, (void *)c);
     inode* __inode = (inode*)malloc(sizeof(inode));
@@ -664,8 +692,8 @@ int remove_file(int inumber) {
     super_block* sb = find_super_block();
     
     //Finding the required __innode
-    int inode_block_idx = sb->inode_block_idx + inumber/128;
-    int inode_i = inumber%128;
+    int inode_block_idx = sb->inode_block_idx + inumber/INODES_PER_BLOCK;
+    int inode_i = inumber%INODES_PER_BLOCK;
     char* c = (char *)malloc(BLOCKSIZE*sizeof(char));
     read_block(global_diskptr, inode_block_idx, (void *)c);
     inode* __inode = (inode*)malloc(sizeof(inode));
@@ -714,20 +742,6 @@ int remove_file(int inumber) {
 
     return 0;
 
-}
-
-int parse_path(char* dirpath) {
-    if(dirpath[0] != '/') {
-        return -1;
-    }
-
-    int slash = 0;
-    for(int i=0;dirpath[i] != EOF; i++) {
-        if(dirpath[i] == '/') {
-            slash ++;
-        }
-    }
-    return slash;
 }
 
 int find_file(super_block* sb, int curr_inode, char* filename, int type) {
@@ -863,11 +877,14 @@ void print_rootdir_data(super_block* sb, int inumber) {
     dir_entry de;
     for(int i=0;i<__inode->size/32;++i) {
         memcpy(&de, temp + i*32, 32);
-        printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
-        printf("FILE NAME INODE IN ROOT %d\n", de.inode);
-        printf("FILE NAME IN ROOT %s\n", de.filename);
-        if(__inode->size > 0) {
-            print_rootdir_data(sb, de.inode);
+        printf("META DATA %d\n", de.meta_data);
+        if(de.meta_data & 1) {
+            printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+            printf("FILE NAME INODE IN ROOT %d\n", de.inode);
+            printf("FILE NAME IN ROOT %s\n", de.filename);
+            if(__inode->size > 0) {
+                print_rootdir_data(sb, de.inode);
+            }
         }
     }
 
@@ -1060,6 +1077,7 @@ void delete_recursive(super_block* sb, int inumber) {
     // dir_entry d;
     // memcpy(&d, temp + i*32, 32);
     for(int i=0;i < __inode->size/32;++i) {
+        // printf("IN FOR LOOP\n");
         memcpy(de, temp + i*32, 32);
 
         int t = de->meta_data >> 1;
@@ -1104,7 +1122,9 @@ int remove_dir(char *dir) {
             string_i++;
         }
         final=string_i-1;
-
+        while(dir[string_i]=='/'){
+            string_i++;
+        } 
         memset(filename, '\0', 27);
 
         int i;
@@ -1112,7 +1132,7 @@ int remove_dir(char *dir) {
             filename[i] = dir[start+i];
         }
         filename[i]='\0';
-        //printf("%s \t %d\n", filename, curr_inode);
+        // printf("%s \t %d\n", filename, curr_inode);
 
         prev_inode = curr_inode;
         curr_inode = find_file(sb, curr_inode, filename, 1);
@@ -1120,17 +1140,17 @@ int remove_dir(char *dir) {
             break;
         }
     }
-
+    // printf("Curr Inode: %d, Prev Inode: %d\n", curr_inode, prev_inode);
+    // exit(0);
     if(curr_inode < 0) {
-        //printf("INVALID PATH\n");
+        printf("INVALID PATH\n");
         return -1;
     }
 
     delete_recursive(sb, curr_inode);
 
     // TODO set entry invalid        
-    print_rootdir_data(sb, 0);    
-    //printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+    
 
     inode* __inode = find_inode(sb, prev_inode);
 
@@ -1148,13 +1168,15 @@ int remove_dir(char *dir) {
 
             for(int i=0;i<min(entries_per_block, remaining_entries) ;++i) {
                 memcpy(temp_de, temp + i*32, 32);
-                if(temp_de->inode == curr_inode) {
-                    temp_de->meta_data &= ~(1);
-                    flag = 1;
+                if(temp_de->meta_data && 1) {
+                    if(temp_de->inode == curr_inode) {
+                        temp_de->meta_data &= ~(1);
+                        flag = 1;
 
-                    memcpy(temp + i*32, temp_de, 32);
-                    write_block(global_diskptr, sb->data_block_idx + d_block, (void *)temp);
-                    break;
+                        memcpy(temp + i*32, temp_de, 32);
+                        write_block(global_diskptr, sb->data_block_idx + d_block, (void *)temp);
+                        break;
+                    }
                 }
             }
             remaining_entries -= min(entries_per_block, remaining_entries);
@@ -1188,5 +1210,8 @@ int remove_dir(char *dir) {
         }
         b_index ++ ;
     }
+
+    // print_rootdir_data(sb, 0);    
+    // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
     return 0;
 }

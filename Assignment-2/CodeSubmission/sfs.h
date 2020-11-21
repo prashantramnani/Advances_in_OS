@@ -1,7 +1,9 @@
 #include<stdint.h>
 
-const static uint32_t MAGIC = 12345;
-const static uint32_t entries_per_block = BLOCKSIZE/32;
+#define MAGIC 12345
+#define entries_per_block (BLOCKSIZE/32)
+#define INODES_PER_BLOCK (BLOCKSIZE/32)
+#define NUM_INDIRECT_PTR (BLOCKSIZE/4)
 
 typedef struct inode {
 	uint32_t valid; // 0 if invalid

@@ -10,3 +10,6 @@ sfs.o: sfs.c sfs.h
 	gcc -c -g sfs.c
 disk.o: disk.c disk.h
 	gcc -c -g disk.c
+
+clean:	
+	rm -rf *.o main sodhi

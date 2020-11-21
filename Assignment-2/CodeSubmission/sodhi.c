@@ -227,13 +227,23 @@ int main()
 	printf("\n26. Deleting directory %s\n", dirpath);
 	remove_dir(dirpath);
 
+
+	// printf("\n27. Creating Another Directory\n");
+	// dirpath = "/hello1/";
+	// if(create_dir(dirpath)< 0)
+	// {
+	// 	printf("Error in creation of directory %s!\n", dirpath);
+	// }
+	// else {
+	// 	printf("Successfully created directory %s!\n", dirpath);
+	// }
 	// printf("\n27. Checking avaialble inodes and datanodes\n");
 	// printf("Avaiable inodes are: ");
 	// avaialble_inodes();
 	// printf("\nAvaiable datanodes are: ");
 	// avaialble_datanodes();
 	// printf("\n");
-
 	free_disk(diskptr);
+	printf("END\n");
 	return 0;
 }
