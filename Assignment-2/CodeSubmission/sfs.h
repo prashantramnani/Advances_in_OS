@@ -58,6 +58,6 @@ void print_superblock_info(super_block* sb);
 
 int is_valid(super_block* sb, int inumber, int offset);
 
-void unset_kth_bit(super_block* sb, int block_index, int offset);
+int unset_kth_bit(super_block* sb, int block_index, int offset);
 
 static disk *global_diskptr = NULL;

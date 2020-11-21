@@ -574,7 +574,7 @@ int read_i(int inumber, char *data, int length, int offset) {
             read_block(global_diskptr, sb->data_block_idx + __inode->indirect, (void *)temp);
             block_index = temp[b_index -5];       
         }
-        printf("block_index: %d\n", block_index);
+        // printf("block_index: %d\n", block_index);
         if(offset >= b_index*BLOCKSIZE && offset < (b_index+1)*BLOCKSIZE) {
             // Write to block number we found or allocated above 
             // write_to_block_i(data, min(length, (b_index+1)*Blocksize - offset))
@@ -616,19 +616,19 @@ int read_i(int inumber, char *data, int length, int offset) {
 }
 
 // Util function for handling the data bit map;
-void unset_kth_bit(super_block* sb, int block_index, int offset){
-
+int unset_kth_bit(super_block* sb, int block_index, int offset){
     // 8*BLOCKSIZE - number of bits in one block
-    int bitmap_block_i = offset + block_index / 8*BLOCKSIZE;
+    int bitmap_block_i = offset + (block_index / (8*BLOCKSIZE));
     int data_bit_i = block_index % (8*BLOCKSIZE);
-
     int* A = (int *)calloc(BLOCKSIZE, sizeof(char));
     if(read_block(global_diskptr, bitmap_block_i, (void *)A)!=0){
-        exit(-1);
+        printf("Error in reading block\n");
+        return -1;
     }
 
     A[(data_bit_i/32)] &= ~(1 << (data_bit_i%32));
     write_block(global_diskptr, bitmap_block_i, (void *)A);
+    return 0;
 }
 
 
@@ -684,6 +684,7 @@ void print_bitmap_info(super_block* sb, int inumber) {
 }
 
 int remove_file(int inumber) {
+    // printf("inumber %d\n", inumber);
     if(global_diskptr == NULL) {
 		return -1;
 	}
@@ -709,7 +710,7 @@ int remove_file(int inumber) {
     // Update the indode
     memcpy(c+(32*inode_i), __inode, sizeof(inode));
     write_block(global_diskptr, inode_block_idx, (void *)c);
-
+    // printf("__inode->size: %d\n", __inode->size);
     int data_blocks = ceil(__inode->size, BLOCKSIZE);    
     int b_index = 0;
     int indirect_block_id;
@@ -730,15 +731,21 @@ int remove_file(int inumber) {
         else {
             block_index = temp[b_index - 5];
         }
-        unset_kth_bit(sb, block_index, sb->data_block_bitmap_idx);
+        if(unset_kth_bit(sb, block_index, sb->data_block_bitmap_idx) < 0) {
+            printf("Error in setting kth bit");
+            return -1;
+        }
         b_index++;
     }
-
+    // printf("indirect ptr unset\n");
     if(data_blocks > 5) {
-        unset_kth_bit(sb, indirect_block_id, sb->data_block_bitmap_idx); // Unsetting the bit for indirect pointer
+        if(unset_kth_bit(sb, indirect_block_id, sb->data_block_bitmap_idx) < 0) {
+            printf("Error in setting kth bit");
+            return -1;
+        } // Unsetting the bit for indirect pointer
     }
 
-    unset_kth_bit(sb, inumber, 1); //Unsetting the bit in inode bit map
+    return unset_kth_bit(sb, inumber, 1); //Unsetting the bit in inode bit map
 
     return 0;
 
